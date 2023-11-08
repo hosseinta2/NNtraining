@@ -95,6 +95,7 @@ class fashionmnistCNNmodel1(nn.Module):
         torch.nn.init.normal_(self.layer3.weight, 
                       mean=0, std=1)
         self.m = hidden_units1**0.5
+        
     def forward(self, x):
         return self.layer3(self.ReLU(self.layer2( self.ReLU( self.layer1( self.flatten(x) ) )/self.m) )/self.m )
     
@@ -104,8 +105,10 @@ class fashionmnistCNNmodel1(nn.Module):
 ## hu1 = 20 --> step_size = 0.03
 ## hu1= 50 -->step_size = 0.02
 ## hu1 =100 --->step_size = .02
-
-for hu1 in [20,50,100]: # numeder of hidden units
+test_loss_m = []
+weight_diff_m = []
+train_loss_m = []
+for hu1 in [50,80,100]: # numeder of hidden units
     
     model0 = fashionmnistCNNmodel1(in_features=32*32*3, hidden_units1=hu1, hidden_units2 = hu1, out_features=2)
     
@@ -117,10 +120,10 @@ for hu1 in [20,50,100]: # numeder of hidden units
     
     # loss and optimizer
     loss_fn = nn.CrossEntropyLoss()
-    step_size= .2
+    step_size= .02
     optimizer = torch.optim.SGD(params=model0.parameters(), lr = step_size)
     
-    T = 100 # num of iterations
+    T = 120 # num of iterations
     train_loss = []
     test_acc=0
     test_loss=[]
@@ -171,8 +174,33 @@ for hu1 in [20,50,100]: # numeder of hidden units
     for i in range(T):
         wi = np.array(nnweights_t[i])
         diff.append(la.norm(wi-init))
-    #plt.plot (range(T), test_loss, label ="test accuracy, m=%d" %hu1 , linewidth = 0.8)
-    #plt.plot (range(T), train_loss_list, label ="train loss, m=%d" %hu1 , linewidth = 0.8)
-    plt.plot (range(T), diff, label ="weights diff, m=%d" %hu1 , linewidth = 0.8)
-    
-    plt.legend()
+    weight_diff_m.append(diff)
+    test_loss_m.append(test_loss)
+    train_loss_m.append(train_loss_list)
+
+vec = [50,80,100]
+fig1 = plt.figure("Figure 1")
+for i in range(3):
+    plt.plot (range(T), test_loss_m[i], label ="m=%d" %vec[i] , linewidth = 0.8)
+
+#plt.plot (range(T), train_loss_list, label ="train loss, m=%d" %hu1 , linewidth = 0.8)
+plt.xlabel("t")
+plt.ylabel("test accuracy")
+plt.legend()
+
+fig3 = plt.figure("Figure 3")
+for i in range(3):
+    plt.plot (range(T), train_loss_m[i], label ="m=%d" %vec[i] , linewidth = 0.8)
+
+#plt.plot (range(T), train_loss_list, label ="train loss, m=%d" %hu1 , linewidth = 0.8)
+plt.xlabel("t")
+plt.ylabel("train_loss")
+plt.legend()
+
+fig2 = plt.figure("Figure 2")
+for i in range(3):
+    plt.plot (range(T), weight_diff_m[i], label ="m=%d" %vec[i] , linewidth = 0.8)
+
+plt.xlabel("t")
+plt.ylabel("dist(w(t),w(0))")
+plt.legend()
