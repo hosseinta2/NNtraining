@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Aug 26 00:55:08 2023
+
+@author: hosseintaheri
+"""
+
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from torch import nn
+import math 
+from mpl_toolkits import mplot3d 
+
+
+
+n = 10000
+d = 200
+thetas = torch.zeros(d,1)
+thetas[0] = 1
+X = torch.randn([n,d])/math.sqrt(d)
+Y = np.sign(torch.matmul(X,thetas))
+Y = (Y+1)/2 
+
+print(torch.linalg.matrix_rank(X))
+
+sz = 100 # training set size
+Xtr = X[:sz,:]
+Ytr = Y[:sz]
+Xts = X[sz:,]
+Yts = Y[sz:]
+
+class LinearRegressionModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.weights = nn.Parameter(torch.randn([d,1],requires_grad=True,dtype=torch.float))
+        self.bias = nn.Parameter(torch.randn(1,requires_grad=True,dtype=torch.float))
+        nn.init.zeros_(self.weights)      # for zero initialization  
+        nn.init.zeros_(self.bias)
+    def forward(self, x: torch.Tensor)-> torch.Tensor:
+            return torch.sigmoid(torch.matmul(x,self.weights) + self.bias)
+
+
+    
+
+#step_size = 50 # learning rate eta
+
+
+train_loss = []
+test_error = []
+upperbound = []
+test_loss = []
+gen_gap = []
+weights = []
+direct = [] 
+correct = []
+T = 200# last epoch
+t = 0# first iter
+stepslist = [50]
+for step_size in stepslist:
+  train_loss = []
+  test_error = []
+  train_error = []
+  upperbound = []
+  test_loss = []
+  gen_gap = []
+  bias_vec = []
+  ratio_vec = []
+  grads_norm_vec = []
+  model_0 = LinearRegressionModel()
+  optimizer = torch.optim.SGD(params=model_0.parameters(),lr = step_size)
+  logloss = nn.BCELoss()
+
+  
+  for epoch in range(T):# number of steps
+    with torch.inference_mode(): # evaluating the model
+      train_preds = model_0(Xtr)
+      test_preds = model_0(Xts)
+    
+      zero_one_loss_ts = np.sign((test_preds-0.5)*(Yts-0.5))
+      zero_one_loss_tr = np.sign((train_preds-0.5)*(Ytr-0.5)) 
+    
+      epoch_loss = logloss(train_preds,Ytr) # L(w_t)
+    
+     # upperbound.append(step_size*sum(train_loss)/sz )
+      train_loss.append(epoch_loss) # vector of training loss
+    
+      test_loss.append(logloss(test_preds,Yts))
+      test_error.append(1-torch.sum((zero_one_loss_ts+1)/(2*n-2*sz)))# 0-1 test loss
+      train_error.append(1-torch.sum((zero_one_loss_tr+1)/(2*sz)))
+    
+      gen_gap.append(logloss(test_preds,Yts) - epoch_loss ) # generalization gap
+     
+      #normm = 0
+      #direction = 0
+      k = 0
+      for param in model_0.parameters():
+          k += 1
+          if k==2:
+              bias_vec.append(param.item())
+        
+      #  multi = torch.matmul(Xtr,param) * (2*Ytr-1)
+      #weights.append(torch.norm(normm))
+      #direct.append(direction/normm)
+    
+    #pos = [0]*sz
+    #pos = [torch.sign(a).item() for a in multi]
+    #pos = [(a+1)/2 for a in pos] # percentage of correctly classified points
+    #correct.append(sum(pos)/sz)
+   
+    model_0.train() # put the model in training mode (this is the default settings)
+    Y_preds = model_0(Xtr)# forward pass
+    loss = logloss(Y_preds,Ytr) #calculate the loss
+    optimizer.zero_grad() # zero the gradient of optimizer
+    loss.backward() # backpropagate on the loss
+    optimizer.step() # one step of SGD
+    model_0.eval() # puts the model in evaluation modeå
+    grads_weights = model_0.weights.grad
+    grads_bias = model_0.bias.grad
+    grads_norm = torch.sqrt((torch.norm(grads_weights))**2  +  (torch.norm(grads_bias))**2) 
+    grads_norm_vec.append(grads_norm)
+  #plt.yscale("log")
+  #ratio_vec = [grads_norm_vec[i]/train_loss[i] for i in range(T)]
+  plt.plot (range(t,T), train_loss[t:], label ="train loss, step size = %d" %step_size, linewidth = 1)
+  plt.plot (range(t,T), grads_norm_vec[t:], label ="Gradient norm, step size = %d" %step_size, linewidth = 1)
+  plt.plot (range(t,T), bias_vec[t:], label ="bias, step size = %d" %step_size, linewidth = 0.8)
+
+
+
+  #plt.plot (range(t,T), test_error[t:], label ="test error, step size = %d" %step_size, linewidth = 0.8)
+  #plt.plot (range(t,T), train_error[t:], label ="train error, step size = %d" %step_size, linewidth = 0.8)
+  
+  #plt.plot (range(t,T),test_loss[t:], label ="test loss, step size = %d" %step_size, linewidth = 0.8)
+#plt.plot (range(t,T),direct[t:], c="purple",label ="weight norm", linewidth = 0.8)
+#plt.plot (range(t,T), correct[t:], c="blue", label ="% of correctly classified", linewidth = 0.8)
+
+
+#plt.plot (range(t,T), gen_gap[t:], c="k", linewidth = 0.8, label ="Generalization gap")
+
+#plt.plot (range(t,T),upperbound[t:], c="blue",label ="Stability bound", linewidth = 0.8)
+ 
+ 
+
+
+
+#plt.plot(range(t,T), [2/step_size]*(T-t), label = "2/eta")
+#plt.plot(range(t,T), [0.5]*(T-t), label= "0.5")
+
+plt.legend()
