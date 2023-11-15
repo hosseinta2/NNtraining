@@ -1,0 +1,36 @@
+fs = 14
+fig1 = plt.figure("Figure 1")
+fig1, ax = plt.subplots()
+ax.set_facecolor('ghostwhite')
+for i in range(len(vec)):
+    
+    hold1 = [x for x in test_acc_m[i]]
+    #test_loss_m.append(hold) 
+    plt.plot (range(5,T), hold1[5:], label ="Test Loss, width=%d" %vec[i] , linewidth = 2.5)
+
+#plt.plot (range(T), train_loss_list, label ="train loss, m=%d" %hu1 , linewidth = 0.8)
+plt.gca().set_prop_cycle(None) # reset the colors in plot
+for i in range(len(vec)):
+    
+    hold2 = [1-x for x in test_error_m[i]]
+    #test_loss_m.append(hold) 
+    plt.plot (range(5,T), hold2[5:], label ="Test Error, width=%d" %vec[i] , linestyle='--', linewidth = 2.5)
+
+#plt.plot (range(T), train_loss_list, label ="train loss, m=%d" %hu1 , linewidth = 0.8)
+
+
+
+# for i in range(len(vec)):
+#     gengap = [sum(train_loss_m[i][:j])/len(train_data) for j in range(1,len(train_loss_m[i])+1)]
+#     gengap1 = [gengap[j] + train_loss_m[i][j] for j in range(len(train_loss_m[i]))]
+#     #plt.plot (range(T), gengap1, label ="stability bound, m=%d" %vec[i] , linestyle='--', linewidth = 0.8)
+
+# #plt.plot (range(T), train_loss_list, label ="train loss, m=%d" %hu1 , linewidth = 0.8)
+plt.xlabel("t",fontsize=fs)
+#plt.ylabel("test loss",fontsize=fs)
+
+plt.yticks(np.arange(0, 1, step=.1))
+plt.yscale("log")
+plt.legend()
+
+fig1.savefig('fig1-2.eps', format='eps', dpi=1200)
