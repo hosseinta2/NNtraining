@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Created on Fri Nov 10 15:22:54 2023
+
+@author: hosseintaheri
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Tue Jun 27 13:09:50 2023
 
 @author: hosseintaheri
@@ -90,16 +98,16 @@ class fashionmnistCNNmodel1(nn.Module):
         self.ReLU   = nn.Softplus()
         self.flatten= nn.Flatten()
         self.m = hidden_units1**0.5 # sqrt(m)
-        # torch.nn.init.normal_(self.layer1.weight, 
-        #               mean=0, std=1)
-        # torch.nn.init.normal_(self.layer2.weight, 
-        #               mean=0, std=1)
-        # torch.nn.init.normal_(self.layer3.weight, 
-        #               mean=0, std=1)
-        
+        torch.nn.init.normal_(self.layer1.weight, 
+                        mean=0, std=1)
+        torch.nn.init.normal_(self.layer2.weight, 
+                        mean=0, std=1)
+        torch.nn.init.normal_(self.layer3.weight, 
+                        mean=0, std=1)
+    
         
     def forward(self, x):
-        return self.layer3(self.ReLU(self.layer2( self.ReLU( self.layer1( self.flatten(x)) )) ) )
+        return self.layer3(self.ReLU(self.layer2( self.ReLU( self.layer1( self.flatten(x)) )/self.m) )/self.m )
     
 def accuracy_fn (y,y_pred):
     num_correct = torch.eq(y,y_pred).sum().item()
@@ -112,7 +120,9 @@ def accuracy_fn (y,y_pred):
 ## hu1 =100 --->step_size = .02
 test_acc_m = []
 test_loss_m=[]
+test_error_m = []
 weight_diff_m = []
+weight_diff2_m = []
 train_loss_m = []
 vec = [20,100]
 
@@ -126,13 +136,14 @@ for hu1 in vec: # numeder of hidden units
     
     # loss and optimizer
     loss_fn = nn.CrossEntropyLoss()
-    step_size = 0.02
+    step_size = 0.015
     optimizer = torch.optim.SGD(params = model0.parameters(), lr = step_size)
     
-    T = 300 #num of iterations
+    T = 500 #num of iterations
     train_loss = []
     test_acc=0
     test_loss = []
+    test_error = []
     nnweights_t = []
     for epoch in range(T):
       
@@ -166,11 +177,14 @@ for hu1 in vec: # numeder of hidden units
       with torch.inference_mode(): # evaluating the model
         for X_test,y_test in test_dataloader:
            test_preds = model0(X_test)
-           #a = test_preds.tolist()
-           #b  = [a[i].index(max(a[i])) for i in range(len(a))]
-           #test_preds = torch.tensor(b)
-           test_acc = loss_fn(test_preds,y_test)
-           test_loss.append(test_acc)
+          
+           
+           test = loss_fn(test_preds,y_test)
+           test_loss.append(test)
+           a = test_preds.tolist()
+           b  = [a[i].index(max(a[i])) for i in range(len(a))]
+           test_preds = torch.tensor(b)
+           test_error.append(1-accuracy_fn(y_test, test_preds))
       #print (f"train loss = {train_loss/len(train_dataloader)}, test accuracy = {test_loss/len(test_dataloader)}") 
     train_loss_list = []
     for i in train_loss:
@@ -178,65 +192,91 @@ for hu1 in vec: # numeder of hidden units
     
     #plt.yscale("log")
     diff = []
+    diff2 = []
     init = np.array(nnweights_t[0])
     
     for i in range(T):
         wi = np.array(nnweights_t[i])
         diff.append(la.norm(wi-init))
+        diff2.append(la.norm(wi))
     weight_diff_m.append(diff)
+    weight_diff2_m.append(diff2)
     test_acc_m.append(test_loss)
+    test_error_m.append(test_error)
     train_loss_m.append(train_loss_list)
 
 fs = 14
 fig1 = plt.figure("Figure 1")
+fig1, ax = plt.subplots()
+ax.set_facecolor('ghostwhite')
 for i in range(len(vec)):
     
-    hold = [x for x in test_acc_m[i]]
+    hold1 = [x for x in test_acc_m[i]]
     #test_loss_m.append(hold) 
-    plt.plot (range(20,T), hold[20:], label ="m=%d" %vec[i] , linewidth = 0.8)
+    plt.plot (range(5,T), hold1[5:], label ="Test Loss, width=%d" %vec[i] , linewidth = 2.5)
 
 #plt.plot (range(T), train_loss_list, label ="train loss, m=%d" %hu1 , linewidth = 0.8)
 plt.gca().set_prop_cycle(None) # reset the colors in plot
-
 for i in range(len(vec)):
-    gengap = [sum(train_loss_m[i][:j])/len(train_data) for j in range(1,len(train_loss_m[i])+1)]
-    gengap1 = [gengap[j] + train_loss_m[i][j] for j in range(len(train_loss_m[i]))]
-    #plt.plot (range(T), gengap1, label ="stability bound, m=%d" %vec[i] , linestyle='--', linewidth = 0.8)
+    
+    hold2 = [1-x for x in test_error_m[i]]
+    #test_loss_m.append(hold) 
+    plt.plot (range(5,T), hold2[5:], label ="Test Error, width=%d" %vec[i] , linestyle='--', linewidth = 2.5)
 
 #plt.plot (range(T), train_loss_list, label ="train loss, m=%d" %hu1 , linewidth = 0.8)
-plt.xlabel("t",fontsize=fs)
-plt.ylabel("test loss",fontsize=fs)
-#plt.legend()
 
-fig1.savefig('fig2.eps', format='eps', dpi=1200)
+
+
+# for i in range(len(vec)):
+#     gengap = [sum(train_loss_m[i][:j])/len(train_data) for j in range(1,len(train_loss_m[i])+1)]
+#     gengap1 = [gengap[j] + train_loss_m[i][j] for j in range(len(train_loss_m[i]))]
+#     #plt.plot (range(T), gengap1, label ="stability bound, m=%d" %vec[i] , linestyle='--', linewidth = 0.8)
+
+# #plt.plot (range(T), train_loss_list, label ="train loss, m=%d" %hu1 , linewidth = 0.8)
+plt.xlabel("t",fontsize=fs)
+#plt.ylabel("test loss",fontsize=fs)
+
+plt.yticks(np.arange(0, 1, step=10**(-1)))
+plt.yscale("log")
+plt.legend()
+
+fig1.savefig('fig2-2.eps', format='eps', dpi=1200)
 
 
 
 
 fig2 = plt.figure("Figure 2")
+fig2, ax = plt.subplots()
+ax.set_facecolor('ghostwhite')
 for i in range(len(vec)):
-    plt.plot (range(T), weight_diff_m[i], label ="m=%d" %vec[i] , linewidth = 0.8)
-
+    plt.plot (range(T), weight_diff_m[i], label ="width=%d" %vec[i] , linewidth = 2.5)
+plt.gca().set_prop_cycle(None) # reset the colors in plot
+#for i in range(len(vec)):
+    #plt.plot (range(T), weight_diff2_m[i], label ="$\| w_t \|$, width=%d" %vec[i] , linestyle='--', linewidth =2.5)
 plt.xlabel("t",fontsize=fs)
-plt.ylabel("|| $w_t$ - $w_0$ ||",fontsize=fs)
+plt.ylabel("$\| w_t - w_0 \|$",fontsize = fs)
 plt.legend()
-fig2.savefig('fig1.eps', format='eps', dpi=1200)
+
+fig2.savefig('fig2-1.eps', format='eps', dpi=1200)
 
 fig3 = plt.figure("Figure 3")
-
+fig3, ax = plt.subplots()
+ax.set_facecolor('ghostwhite')
 for i in range(len(vec)):
 
-    plt.plot (range(10,T), train_loss_m[i][10:], label ="m=%d" %vec[i] , linewidth = 0.8)
+    plt.plot (range(10,T), train_loss_m[i][10:], label ="m=%d" %vec[i] , linewidth = 2.5)
 
 #plt.yscale("log")
 plt.xlabel("t",fontsize=fs)
-plt.ylabel("train loss",fontsize=fs)
+plt.ylabel("Train Loss",fontsize=fs)
 #plt.legend()
-fig3.savefig('fig3.eps', format='eps', dpi=1200)
+fig3.savefig('fig2-3.eps', format='eps', dpi=1200)
+
 
 
 fig4 = plt.figure("Figure 4")
-
+fig4, ax = plt.subplots()
+ax.set_facecolor('ghostwhite')
 # for i in range(len(vec)):
 #     gen_loss= [test_loss_m[i][j] - train_loss_m[i][j] for j in range(len(test_loss_m[i]))]
 #     plt.plot (range(T), gen_loss, label ="m=%d" %vec[i] , linewidth = 0.8)
@@ -246,8 +286,8 @@ fig4 = plt.figure("Figure 4")
 
 for i in range(len(vec)):
     gengap = [sum(train_loss_m[i][:j])/len(train_data) for j in range(1,len(train_loss_m[i])+1)]
-    plt.plot (range(T), gengap, label ="stability bound, m=%d" %vec[i] , linestyle='--', linewidth = 0.8)
+    plt.plot (range(T), gengap, label ="stability bound, m=%d" %vec[i] , linestyle='--', linewidth =2.5)
 
 plt.xlabel("t",fontsize=fs)
 plt.ylabel("Gen. bound (stability)",fontsize=fs)
-fig4.savefig('fig4.eps', format='eps', dpi=1200)
+fig4.savefig('fig2-4.eps', format='eps', dpi=1200)
