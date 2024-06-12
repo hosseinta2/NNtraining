@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Jun 12 13:47:51 2024
+
+@author: hosseintaheri
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 15 17:54:49 2024
+
+@author: hosseintaheri
+"""
+import torch
+import torch.nn as nn
+import numpy as np
+import matplotlib.pyplot as plt
+# Define the quadratic activation function
+class QuadraticActivation(nn.Module):
+    def forward(self, x):
+        return x ** 2
+
+# Linear loss defined for +/-1 labels
+class logloss(nn.Module):
+    def __init__(self):
+        super(logloss, self).__init__()
+
+    def forward(self, preds, labels):
+        # Example custom loss: Mean Absolute Error
+        loss = torch.mean(-preds*labels)
+        return loss
+
+# Generate the data points
+d = 200 # data dimension
+num_points = 10**4 # total number of points in the distribution
+data_points = torch.from_numpy(np.random.choice([-1, 1], size=(num_points, d), replace=True)).float()
+#data_points = data_points/(d**0.5)
+# Generate the labels
+labels = torch.sign(data_points[:, 0] * data_points[:, 1])
+
+# Split the data into training and test sets
+num_train_points = 10**4 # training-set size
+train_indices = torch.randperm(num_points)[:num_train_points]
+test_indices = torch.randperm(num_points)[num_train_points:]
+
+train_data = data_points[train_indices]
+train_labels = labels[train_indices]
+test_data = data_points[test_indices]
+test_labels = labels[test_indices]
+
+num_neurons = 4
+learning_rate = num_neurons # \eta = m
+num_iterations = 100
+# Define the neural network model
+class OneHiddenLayerNN(nn.Module):
+    def __init__(self):
+        super(OneHiddenLayerNN, self).__init__()
+        self.fc1 = nn.Linear(d, num_neurons)
+        self.fc2 = nn.Linear(num_neurons, 1, bias=False)
+        self.fc2.weight.data = torch.from_numpy(np.random.choice([-1, 1], size=(1, num_neurons))).float() # second layer weights, fixed
+        torch.nn.init.normal_(self.fc1.weight,
+                        mean=0, std=1/(d**0.5)) # first layer initialization
+        self.activation = QuadraticActivation()
+        #nn.init.zeros_(self.fc1.weight)
+    def forward(self, x):
+        x = self.activation(self.fc1(x))/(num_neurons) # normalized by the number of neuronsß
+        x = self.fc2(x)
+        return x
+
+# Define the training parameters
+
+
+# Initialize the model, loss function, and optimizer
+model = OneHiddenLayerNN()
+criterion = logloss()
+optimizer = torch.optim.SGD(model.fc1.parameters(), lr=learning_rate)  # Fix the weights of the second layer
+
+# Lists to store training and test errors
+train_errors = []
+test_errors = []
+#print("Initial weights of the first layer:", model.fc1.weight)
+#print("Initial weights of the second layer:", model.fc2.weight)
+
+#init = model.fc1.weight
+# Training loop
+for i in range(num_iterations):
+     with torch.no_grad():
+          train_outputs = model(train_data)
+          train_predicted_labels = torch.sign(train_outputs.squeeze())
+          train_error = torch.mean((train_predicted_labels != train_labels).float())
+          train_errors.append(train_error.item())
+
+        # Calculate test error
+          test_outputs = model(test_data)
+          test_predicted_labels = torch.sign(test_outputs.squeeze())
+          test_error = torch.mean((test_predicted_labels != test_labels).float())
+          test_errors.append(test_error.item())
+     # Forward pass
+
+     outputs = model(train_data)
+     loss = criterion(outputs.squeeze(), train_labels)  # Convert labels from -1, 1 to 0, 1
+
+    # Backward pass and optimization
+     optimizer.zero_grad()
+     loss.backward()
+     optimizer.step()
+     if i%10==0:
+        print("iteration =",i)
+        #print("Initial weights of the second layer:", model.fc1.weight)
+
+    # Calculate training error
+
+#print("final weights of the first layer:", model.fc1.weight)
+# Plot training and test errors
+plt.plot(range(num_iterations), train_errors, label='Training Error')
+plt.plot(range(num_iterations), test_errors, label='Test Error')
+plt.xlabel('Iteration')
+plt.ylabel('Error')
+plt.title('step size= %.1f' %learning_rate)
+plt.legend()
+plt.show()
+
